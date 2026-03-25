@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <head>
+    <title>My Notes</title>
+  </head>
+  <body>
+    <h1>📝 My Private Notes</h1>
+
+    <form method="post" action="/add">
+      <input name="note" placeholder="Write something..." required />
+      <button type="submit">Add</button>
+    </form>
+
+    <hr />
+
+    <ul>
+      {% for note in notes %}
+      <li>
+        {{ note[1] }}
+        <a href="/delete/{{ note[0] }}">❌</a>
+      </li>
+      {% endfor %}
+    </ul>
+
+    <br />
+    <a href="/logout">Logout</a>
+  </body>
+</html>
