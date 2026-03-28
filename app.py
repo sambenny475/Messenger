@@ -6,7 +6,8 @@ app = Flask(__name__)
 app.secret_key = "secret123"
 socketio = SocketIO(app)
 
-USER = {"admin": "password"}
+USER = {"admin": "password",
+        "sam": "1234"}
 
 
 def get_db():
