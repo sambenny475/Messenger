@@ -6,18 +6,35 @@ app = Flask(__name__)
 app.secret_key = "secret123"
 socketio = SocketIO(app)
 
-USER = {"admin": "password",
-        "sam": "1234"}
-
 
 def get_db():
     return sqlite3.connect('notes.db')
 
 
-@app.route('/')
+# Create messages table
+def init_db():
+    conn = get_db()
+    conn.execute('''
+    CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY,
+        username TEXT,
+        message TEXT
+    )
+    ''')
+    conn.close()
+
+
+init_db()
+
+
+@app.route('/', methods=['GET', 'POST'])
 def home():
+    # Ask username first
     if 'user' not in session:
-        return redirect('/login')
+        if request.method == 'POST':
+            session['user'] = request.form['username']
+            return redirect('/')
+        return render_template('username.html')
 
     conn = get_db()
     messages = conn.execute('SELECT * FROM messages').fetchall()
@@ -40,21 +57,6 @@ def handle_message(data):
         conn.close()
 
         send({'user': user, 'msg': data}, broadcast=True)
-
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        if request.form['username'] in USER and USER[request.form['username']] == request.form['password']:
-            session['user'] = request.form['username']
-            return redirect('/')
-    return render_template('login.html')
-
-
-@app.route('/logout')
-def logout():
-    session.pop('user', None)
-    return redirect('/login')
 
 
 if __name__ == '__main__':
