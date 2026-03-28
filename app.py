@@ -1,61 +1,60 @@
 from flask import Flask, render_template, request, redirect, session
+from flask_socketio import SocketIO, send
 import sqlite3
 
 app = Flask(__name__)
 app.secret_key = "secret123"
+socketio = SocketIO(app)
 
-USERNAME = "admin"
-PASSWORD = "password"
+USER = {"admin": "password"}
 
-# Create DB
-def init_db():
-    conn = sqlite3.connect('notes.db')
-    conn.execute('CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, content TEXT)')
-    conn.close()
 
-init_db()
+def get_db():
+    return sqlite3.connect('notes.db')
+
 
 @app.route('/')
 def home():
-    if 'user' in session:
-        conn = sqlite3.connect('notes.db')
-        notes = conn.execute('SELECT * FROM notes').fetchall()
+    if 'user' not in session:
+        return redirect('/login')
+
+    conn = get_db()
+    messages = conn.execute('SELECT * FROM messages').fetchall()
+    conn.close()
+
+    return render_template('chat.html', messages=messages)
+
+
+@socketio.on('message')
+def handle_message(data):
+    user = session.get('user')
+
+    if user and data.strip():
+        conn = get_db()
+        conn.execute(
+            'INSERT INTO messages (username, message) VALUES (?, ?)',
+            (user, data)
+        )
+        conn.commit()
         conn.close()
-        return render_template('home.html', notes=notes)
-    return redirect('/login')
+
+        send({'user': user, 'msg': data}, broadcast=True)
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        if request.form['username'] == USERNAME and request.form['password'] == PASSWORD:
+        if request.form['username'] in USER and USER[request.form['username']] == request.form['password']:
             session['user'] = request.form['username']
             return redirect('/')
-        return "Wrong credentials ❌"
     return render_template('login.html')
 
-@app.route('/add', methods=['POST'])
-def add_note():
-    if 'user' in session:
-        note = request.form['note']
-        conn = sqlite3.connect('notes.db')
-        conn.execute('INSERT INTO notes (content) VALUES (?)', (note,))
-        conn.commit()
-        conn.close()
-    return redirect('/')
-
-@app.route('/delete/<int:id>')
-def delete_note(id):
-    if 'user' in session:
-        conn = sqlite3.connect('notes.db')
-        conn.execute('DELETE FROM notes WHERE id=?', (id,))
-        conn.commit()
-        conn.close()
-    return redirect('/')
 
 @app.route('/logout')
 def logout():
     session.pop('user', None)
     return redirect('/login')
 
+
 if __name__ == '__main__':
-    app.run()
+    socketio.run(app, host='0.0.0.0', port=5000)
